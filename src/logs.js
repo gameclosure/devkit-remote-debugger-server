@@ -6,21 +6,21 @@ var loggerContainer = new winston.Container({
 
 loggerContainer.add('main', {
   console: {
-    label: 'main',
+    label: 'remoteDebug.main',
     colorize: true
   }
 });
 
 loggerContainer.add('proxy', {
   console: {
-    label: 'proxy',
+    label: 'remoteDebug.proxy',
     colorize: true
   }
 });
 
 loggerContainer.add('proxyClient', {
   console: {
-    label: 'proxyClient',
+    label: 'remoteDebug.proxyClient',
     colorize: true
   }
 });

@@ -1,6 +1,6 @@
 var events = require('events');
-var net = require('net');
 var util = require('util');
+var net = require('net');
 
 var DebuggerProxyClient = require('./DebuggerProxyClient');
 
@@ -22,8 +22,8 @@ util.inherits(Server, events.EventEmitter);
 
 Server.prototype.start = function() {
   this.logger.info('starting debugger proxy');
-  this.logger.info('  listening for phones on port', this.clientPort);
-  this.logger.info('  waiting for ff-adaptor on port', this.serverPort);
+  this.logger.info('  listening for phones on client port', this.clientPort);
+  this.logger.info('  waiting for ff-adaptor on server port', this.serverPort);
 
   net.createServer(this.onDevice.bind(this)).listen(this.clientPort);
   net.createServer(this.onServer.bind(this)).listen(this.serverPort);
@@ -45,12 +45,6 @@ Server.prototype.onDevice = function(socket) {
   this.logger.info('phone connected');
   this.client = new DebuggerProxyClient(socket);
   this.emit('device-connected');
-};
-
-Server.prototype.serverConnected = function(client) {
-  this.logger.info('Upgrading debugger client to server');
-  this.server = client;
-  this.emit('serverConnected', client);
 };
 
 Server.prototype.startDebugging = function() {
@@ -77,5 +71,6 @@ Server.prototype.clientDisconnected = function(client) {
   this._connected = false;
   this.emit('endDebugging');
 };
+
 
 module.exports = Server;

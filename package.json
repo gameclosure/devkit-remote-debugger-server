@@ -1,12 +1,14 @@
 {
   "name": "jsio-remote-debugger-server",
   "version": "0.0.1",
+  "main": "src/index.js",
   "dependencies": {
+    "bluebird": "^2.10.0",
     "bunyan": "^1.5.1",
     "remotedebug-firefox-adaptor": "git+ssh://git@github.com:weebygames/remotedebug-firefox-adapter",
     "winston": "^1.0.1"
   },
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/serve.js"
   }
 }
