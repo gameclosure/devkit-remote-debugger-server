@@ -91,3 +91,13 @@ RemoteDebuggingServer.prototype.onRun = function(appDir) {
 
 
 module.exports = RemoteDebuggingServer;
+
+process.on('uncaughtException', function (e) {
+  console.log("uncaught exception!");
+  console.error(e.stack);
+});
+
+if (require.main == module) {
+  new RemoteDebuggingServer().start();
+}
+
