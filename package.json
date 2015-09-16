@@ -1,5 +1,5 @@
 {
-  "name": "jsio-remote-debugger-server",
+  "name": "devkit-remote-debugger-server",
   "version": "0.0.1",
   "main": "src/index.js",
   "dependencies": {
