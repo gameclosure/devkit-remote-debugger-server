@@ -43,9 +43,10 @@ RemoteDebuggingServer.prototype.start = function(opts) {
 
   this.debuggerProxy.on('endDebugging', function() {
     logger.info('Destroying FirefoxAdapter');
-    this.ffAdapter.destroy().finally(function() {
-      this._resetFFAdapter();
-    }.bind(this));
+    this.ffAdapter.destroy()
+    .finally(function() {
+        this._resetFFAdapter();
+      }.bind(this));
   }.bind(this));
 
   // Start things up
@@ -64,8 +65,11 @@ RemoteDebuggingServer.prototype._resetFFAdapter = function(opts) {
     }
   });
 
+  // This is fired when there is something for the adapter to connect to
   forwardEvent('adaptor.ready', this.ffAdapter, this);
 
+  // This is fired now to let things know that the adaptor is fresh
+  this.emit('adaptor.reset');
   this.ffAdapter.startServer();
 };
 
@@ -74,6 +78,7 @@ RemoteDebuggingServer.prototype._resetFFAdapter = function(opts) {
  * @return {Promise}
  */
 RemoteDebuggingServer.prototype.onRun = function(appDir) {
+  logger.info('onRun resetting source cache: ' + appDir);
   // Clear the existing sourceCache
   var sourceCache = this.ffAdapter.client.client.sourceCache;
   sourceCache.reset();

@@ -3,13 +3,12 @@ var util = require('util');
 var net = require('net');
 
 var DebuggerProxyClient = require('./DebuggerProxyClient');
+var logger = require('./logs').proxyLogger;
 
 var Server = function(clientPort, serverPort) {
   events.EventEmitter.call(this);
-  this.logger = require('./logs').proxyLogger;
   this.clientPort = clientPort;
   this.serverPort = serverPort;
-  this.servers = [];
 
   this.server = null;
   this.client = null;
@@ -21,20 +20,24 @@ var Server = function(clientPort, serverPort) {
 util.inherits(Server, events.EventEmitter);
 
 Server.prototype.start = function() {
-  this.logger.info('starting debugger proxy');
-  this.logger.info('  listening for phones on client port', this.clientPort);
-  this.logger.info('  waiting for ff-adaptor on server port', this.serverPort);
+  logger.info('starting debugger proxy');
+  logger.info('  listening for phones on client port', this.clientPort);
+  logger.info('  waiting for ff-adaptor on server port', this.serverPort);
 
   net.createServer(this.onDevice.bind(this)).listen(this.clientPort);
   net.createServer(this.onServer.bind(this)).listen(this.serverPort);
 };
 
 Server.prototype.onServer = function(socket) {
-  this._connected = true;
+  logger.info('debug server connected');
 
-  this.logger.info('debug server connected');
+  if (this.server) {
+    logger.info('cleaning up old server');
+    this.server.destroy();
+  }
+
   this.server = new DebuggerProxyClient(socket);
-  this.servers.push(this.server);
+  this._connected = true;
 
   if (this.client) {
     this.startDebugging();
@@ -42,13 +45,13 @@ Server.prototype.onServer = function(socket) {
 };
 
 Server.prototype.onDevice = function(socket) {
-  this.logger.info('phone connected');
+  logger.info('phone connected');
   this.client = new DebuggerProxyClient(socket);
   this.emit('device-connected');
 };
 
 Server.prototype.startDebugging = function() {
-  this.logger.info('Starting debugging!');
+  logger.info('Starting debugging!');
 
   this.server.socket.pipe(this.client.socket);
   this.client.socket.pipe(this.server.socket);
@@ -61,10 +64,7 @@ Server.prototype.clientDisconnected = function(client) {
     return;
   }
 
-  this.logger.info('Client disconnected, stopping debugging');
-  for (var i = 0, len = this.servers.length; i < len; i++) {
-    this.servers[i].destroy();
-  }
+  logger.info('Client disconnected, stopping debugging');
   this.server = null;
   this.client = null;
 
