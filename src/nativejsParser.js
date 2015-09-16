@@ -1,14 +1,10 @@
 var fs = require('fs');
 
-// Read in native.js
-var path = '/private/tmp/GemSwappers/build/debug/simulator/native.js';
-
-
 module.exports = {
 
   getSrcCache: function(nativejsPath, cb) {
     // Read it in
-    fs.readFile(path, 'utf8', function(err, contents) {
+    fs.readFile(nativejsPath, 'utf8', function(err, contents) {
       if (err) {
         cb('Failed to read file: ' + err);
         return;
