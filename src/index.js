@@ -4,11 +4,12 @@ var util = require('util');
 
 var Promise = require('bluebird');
 
-var DebuggerProxy = require('./DebuggerProxy');
-var FirefoxAdapter = require('remotedebug-firefox-adaptor');
+var FirefoxAdaptor = require('remotedebug-firefox-adaptor');
 var logger = require('./logs').mainLogger;
 
 var nativejsParser = require('./nativejsParser');
+
+var MAX_LOG_LENGTH = 250;
 
 function forwardEvent(event, src, target) {
   src.on(event, target.emit.bind(target, event));
@@ -22,55 +23,80 @@ util.inherits(RemoteDebuggingServer, events.EventEmitter);
 
 /**
  * @method start
- * @param  {Object} [opts]
- * @param  {Number} [opts.clientPort] - for the phones
- * @param  {Number} [opts.serverPort] - for the dev tools
  */
-RemoteDebuggingServer.prototype.start = function(opts) {
-  opts = opts || {};
-  this.clientPort = opts.clientPort || 6000;
-  this.serverPort = opts.serverPort || 6001;
-
+RemoteDebuggingServer.prototype.start = function() {
   logger.info('Starting up...');
-
-  this.debuggerProxy = new DebuggerProxy(this.clientPort, this.serverPort);
-
-  // When a server connects to the proxy, tell the adapter to start the client connection
-  this.debuggerProxy.on('device-connected', function() {
-    logger.info('Device connected, starting the ffAdapter client');
-    this.ffAdapter.startClient();
-  }.bind(this));
-
-  this.debuggerProxy.on('endDebugging', function() {
-    logger.info('Destroying FirefoxAdapter');
-    this.ffAdapter.destroy()
-    .finally(function() {
-        this._resetFFAdapter();
-      }.bind(this));
-  }.bind(this));
-
   // Start things up
-  this._resetFFAdapter();
-  this.debuggerProxy.start();
+  this._resetFFAdaptor();
 };
 
-RemoteDebuggingServer.prototype._resetFFAdapter = function(opts) {
-  logger.info('Restarting FirefoxAdapter');
-  this.ffAdapter = new FirefoxAdapter({
-    client: {
-      port: this.serverPort
-    },
-    server: {
-      port: 9223
-    }
+RemoteDebuggingServer.prototype.onClientConnection = function(websocket) {
+  logger.info('phone connected, starting the ffAdaptor client');
+
+  if (this.websocket) {
+    logger.info('  closing existing websocket connection');
+    this.websocket.close();
+  }
+
+  this.websocket = websocket;
+
+  // Log messages both ways
+  this.websocket.on('message', this._logTraffic.bind(this, true));
+  var originalWrite = this.websocket.send;
+  this.websocket.send = function() {
+    this._logTraffic(false, arguments[0]);
+    return originalWrite.apply(this.websocket, arguments);
+  }.bind(this);
+
+  // Start the adaptor, use this new websocket
+  this.ffAdapter.startClient({
+    websocket: websocket
   });
 
-  // This is fired when there is something for the adapter to connect to
-  forwardEvent('adaptor.ready', this.ffAdapter, this);
+  // clean things up
+  this.websocket.on('close', this._resetFFAdaptor.bind(this));
+};
 
-  // This is fired now to let things know that the adaptor is fresh
-  this.emit('adaptor.reset');
-  this.ffAdapter.startServer();
+RemoteDebuggingServer.prototype._logTraffic = function(fromPhone, data) {
+  var dataString = data.toString();
+  if (dataString.length > MAX_LOG_LENGTH) {
+    dataString = dataString.substring(0, MAX_LOG_LENGTH) + ' ...truncated';
+  }
+  logger.info(fromPhone ? 'phone >>' : 'phone <<', dataString);
+};
+
+RemoteDebuggingServer.prototype._resetFFAdaptor = function(opts) {
+  logger.info('Restarting FirefoxAdaptor');
+
+  var tasks = [];
+
+  if (this.websocket) {
+    tasks.push(this.websocket.close());
+    this.websocket = null;
+  }
+  if (this.ffAdapter) {
+    tasks.push(this.ffAdapter.destroy());
+    this.ffAdapter = null;
+  }
+
+  return Promise.all(tasks)
+    .then(function() {
+      this.ffAdapter = new FirefoxAdaptor({
+        client: {
+          port: this.serverPort
+        },
+        server: {
+          port: 9223
+        }
+      });
+
+      // This is fired when there is something for the adapter to connect to
+      forwardEvent('adaptor.ready', this.ffAdapter, this);
+
+      // This is fired now to let things know that the adaptor is fresh
+      this.emit('adaptor.reset');
+      this.ffAdapter.startServer();
+    }.bind(this));
 };
 
 /**
@@ -101,8 +127,3 @@ process.on('uncaughtException', function (e) {
   console.log("uncaught exception!");
   console.error(e.stack);
 });
-
-if (require.main == module) {
-  new RemoteDebuggingServer().start();
-}
-
